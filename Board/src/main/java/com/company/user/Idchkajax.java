@@ -2,6 +2,9 @@ package com.company.user;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import javax.servlet.ServletException;
@@ -27,14 +30,14 @@ public class Idchkajax extends HttpServlet {
 		
 	String userId =	request.getParameter("userId");
 	PrintWriter out = response.getWriter();
-	
+		
 	
 	
 
 		
 		try {
-			JDBCConnection jdbc = new JDBCConnection();
-			int idCheck = jdbc.checkId(userId);
+			
+			int idCheck = checkId(userId);
 			
 			if(idCheck ==0) {
 				System.out.println("이미 존재하는 아이디");
@@ -53,4 +56,33 @@ public class Idchkajax extends HttpServlet {
 	
 	}
 
+	public int checkId(String id) throws ClassNotFoundException, SQLException {
+		Connection conn = null;
+		PreparedStatement stmt = null;
+		ResultSet rs = null;
+		conn=JDBCConnection.getConnection();
+		String sql = "select * from users where id=?";
+		int idCheck = 0;
+		try {
+			stmt = conn.prepareStatement(sql);
+			stmt.setString(1,id);
+			
+			rs = stmt.executeQuery();
+			
+			if(rs.next()) {
+				idCheck = 0; //이미 존재하는 경우, 생성 불가능.
+			}else {
+				idCheck = 1;
+			}
+			
+		} catch (SQLException e) {
+			
+			e.printStackTrace();
+		}finally {
+		JDBCConnection.close(rs, stmt, conn);
+		}
+		return idCheck;
+		
+	}
+	
 }

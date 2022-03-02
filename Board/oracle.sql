@@ -64,11 +64,9 @@ select * from (select rownum rn, SEQ, TITLE, NICKNAME, CONTENT, REGDATE, USERID 
 INSERT INTO BOARD(SEQ,TITLE,NICKNAME,CONTENT,REGDATE,USERID)
 VALUES((select nvl(max(seq),0)+1 from board),'하하20','일지매','하하','2022-02-28','guest');
 
-select * from (select rownum rn, SEQ, TITLE, NICKNAME, CONTENT, REGDATE, CNT from 
-(select * from board where TITLE like '%하하%' order by seq desc)) 
-where rn between 1 and 10;
+select * from (select rownum rn, SEQ, TITLE, NICKNAME, CONTENT, REGDATE, CNT from (select * from board where TITLE like '%게시물%' order by seq desc)) where rn between 1 and 10;
 
-select * from (select rownum rn, SEQ, TITLE, NICKNAME, CONTENT, REGDATE, CNT from (select * from board where title like '%하하%'order by seq desc)) where rn between 1 and 10;
+"select * from (select rownum rn, SEQ, TITLE, NICKNAME, CONTENT, REGDATE, CNT from (select * from board where title like '%하하%'order by seq desc)) where rn between 1 and 10;"
 
 
 select count(*) from board where title like '%하하%' order by seq desc

@@ -14,6 +14,7 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import com.company.board.vo.BoardVO;
 import com.company.common.JDBCConnection;
@@ -21,69 +22,102 @@ import com.company.common.JDBCConnection;
 @WebServlet("/GetBoardListPro")
 public class GetBoardListPro extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	
-	// dao에 하기 이전  서블릿으로 구현시킨 게시글 리스트.
-	protected void doGet(HttpServletRequest request, HttpServletResponse response)
-			throws ServletException, IOException {
-
-		Connection conn = null;
-		PreparedStatement stmt = null;
-		ResultSet rs = null;
-		int startRow = Integer.parseInt(request.getParameter("startRow"));
-		int endRow = Integer.parseInt(request.getParameter("endRow"));
-
-		// 페이징 처리를 위한 sql / 인라인뷰, rownum 사용
-		String sql ="select * from (select rownum rn, SEQ, TITLE, NICKNAME, CONTENT, REGDATE, CNT from (select * from board order by SEQ desc)) where rn between ? and ?";
+       
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		System.out.println("/GetBoardListPro");
 		
+		int page;
+		if(request.getParameter("page")==null)
+			page=1;
+		else 
+			page=Integer.parseInt(request.getParameter("page"));
 		
-		try {
-			conn = JDBCConnection.getConnection();			
-			stmt = conn.prepareStatement(sql);
-			stmt.setInt(1, startRow);
-			stmt.setInt(2, endRow);
-			rs = stmt.executeQuery();
-			
-			//여러 개의 데이터 값을 전달 할 떄는 컬렉션(arraylist같은...)을 사용하여 vo값을 전달한다.(while(rs.next())사용
-			//단일 데이터 값을 전달 할 때는 vo값만 사용하여 전달한다.(if(rs.next())사용.
-			
-			ArrayList<BoardVO> boardList = new ArrayList<BoardVO>();
-			
-
-			while (rs.next()) {
-				BoardVO board = new BoardVO();
-											
-				board.setSeq(rs.getInt("seq"));
-				board.setTitle(rs.getString("title"));
-				board.setNickname(rs.getString("nickname"));
-				board.setContent(rs.getString("content"));
-				board.setRegdate(rs.getDate("regdate"));
-				board.setCnt(rs.getInt("cnt"));
-				
-				boardList.add(board);// 각 줄을 리스트에 담기. board의 하나의 객체를 생성하고 그걸 리스트에 하나씩 담음. 
-			}
-			
-			//요구시 한번 보여주면 되기때문에 requset영역에 전달.	
-			
-			//1.전달할 데이터를 REQUEST에 담는다.
-			request.setAttribute("boardList", boardList);
-			//2. 지금 사용하는 request와 response를 지정한 페이지로 전달해서 
-			//동일한 request와 response영역을 사용하도록 지정.
-			RequestDispatcher view = request.getRequestDispatcher("getBoardList.jsp");
-			view.forward(request, response);
-			
-			
-		} catch (ClassNotFoundException e) {
-
-			e.printStackTrace();
-		} catch (SQLException e) {
-
-			e.printStackTrace();
-		} finally {
-			JDBCConnection.close(rs, stmt, conn);
+		HttpSession session=request.getSession();
+		String name=(String)session.getAttribute("name");
+		if(name==null) {
+			response.sendRedirect("login.jsp");
+			return;
 		}
-
+		//DB접속
+				Connection conn=null;
+				PreparedStatement stmt=null;
+				ResultSet rs=null;
+				
+				try {
+					conn=JDBCConnection.getConnection();
+//					String sql="select * from board order by seq desc";
+					
+					String sql="select * from (select rownum as rnum,B.* from (select * from board order by seq desc) B)"
+							+ " where rnum between ? and ?";
+					// page 1: 1-10
+					// page 2: 11-20
+					// page 3: 21-30
+					stmt=conn.prepareStatement(sql);
+					
+					// page를 이용하여 각 페이지에 담기는 레코드의 rownum값을 환산
+					stmt.setInt(1, page*10-9);
+					stmt.setInt(2, page*10);
+					
+					rs=stmt.executeQuery();
+					ArrayList<BoardVO> boardList=new ArrayList<BoardVO>();
+					
+					while(rs.next()) {
+						int seq=rs.getInt("seq");
+						String nickname=rs.getString("nickname");
+						String content=rs.getString("content");
+						String title=rs.getString("title");
+						Date regdate=rs.getDate("regdate");
+						int cnt=rs.getInt("cnt");
+						
+						BoardVO board=new BoardVO();
+						board.setSeq(seq);
+						board.setNickname(nickname);
+						board.setContent(content);
+						board.setTitle(title);
+						board.setRegdate(regdate);
+						board.setCnt(cnt);
+						
+						boardList.add(board);   // 각 줄을 리스트에 담는다.
+					}
+					
+					// PrepareStatmement와 Resultset을 재활용하기 위해 자원을 닫고 다시 사용.
+					stmt.close();
+					rs.close();
+					
+					sql="select max(seq) from board";
+					stmt=conn.prepareStatement(sql);
+					rs=stmt.executeQuery();
+					
+					int totalCount=0; //전체 게시글 수 담는 변수
+					if(rs.next()) {
+						totalCount=rs.getInt(1);
+					}
+					System.out.println(totalCount);
+					
+					
+					
+					// 1. 전달할 데이터를 request에 담는다.
+					request.setAttribute("boardList", boardList);
+					request.setAttribute("totalRows", totalCount);
+					
+					// 2. 지금 사용하는 request와 response를 지정한 페이지로 전달해서
+					// 동일한 request와 response를 사용하도록 지정
+					RequestDispatcher view=request.getRequestDispatcher("getBoardList.jsp");
+					view.forward(request, response);
+					
+				} catch (ClassNotFoundException e) {
+					e.printStackTrace();
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}finally {
+					JDBCConnection.close(rs, stmt, conn);
+				}
+				
+				
+				
 	}
 
+	
+	
+
 }
-
-
